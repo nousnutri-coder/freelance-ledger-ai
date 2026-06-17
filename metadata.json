@@ -1,0 +1,8 @@
+{
+  "name": "Freelance Ledger AI",
+  "description": "A high-performance financial management app for freelancers with AI-powered insights, transaction tracking, and project management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
