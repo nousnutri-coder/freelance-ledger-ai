@@ -16,6 +16,7 @@ import PendingItems from './screens/PendingItems';
 import Legal from './screens/Legal';
 import Checkout from './screens/Checkout';
 import PaymentSuccess from './screens/PaymentSuccess';
+import ResetPassword from './screens/ResetPassword';
 import Layout from './components/Layout';
 import { Transaction, KanbanTask, UserProfile, Client, Quotation, CalendarEvent } from './types';
 import { requestNotificationPermission, sendNotification } from './services/notificationService';
@@ -316,6 +317,7 @@ const AuthenticatedApp: React.FC = () => {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
         </Route>
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
     </Router>

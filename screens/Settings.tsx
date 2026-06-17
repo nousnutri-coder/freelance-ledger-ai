@@ -310,7 +310,7 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser }) => {
             <div className="flex flex-col items-center sm:flex-row gap-8 pb-8">
               <div className="relative group">
                 <img
-                  src={profileImage || 'https://via.placeholder.com/100'}
+                  src={profileImage || `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="#10b981"/><text x="50" y="58" font-size="40" font-family="Arial" fill="white" text-anchor="middle" dominant-baseline="middle">${(name || 'U')[0].toUpperCase()}</text></svg>')}`}
                   alt="Perfil"
                   className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-xl"
                 />

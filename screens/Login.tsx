@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 
+const APP_URL = import.meta.env.VITE_APP_URL || 'https://freel.aissistpro.com';
+
 
 interface LoginProps {
   onLogin: () => void;
@@ -94,9 +96,29 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   Contraseña
                 </label>
                 {!isSignUp && (
-                  <a className="text-xs font-semibold text-primary hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors" href="#">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!email.trim()) {
+                        setError('Ingresa tu correo electrónico primero');
+                        return;
+                      }
+                      setLoading(true);
+                      setError(null);
+                      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                        redirectTo: APP_URL + '/reset-password',
+                      });
+                      setLoading(false);
+                      if (error) {
+                        setError(error.message);
+                      } else {
+                        alert('📧 Te hemos enviado un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada.');
+                      }
+                    }}
+                    className="text-xs font-semibold text-primary hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                  >
                     ¿Olvidaste tu contraseña?
-                  </a>
+                  </button>
                 )}
               </div>
               <div className="relative">
@@ -153,7 +175,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 const { error } = await supabase.auth.signInWithOAuth({
                   provider: 'google',
                   options: {
-                    redirectTo: window.location.origin
+                    redirectTo: APP_URL
                   }
                 });
                 if (error) {

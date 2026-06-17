@@ -414,7 +414,7 @@ async function main() {
 
   const config = {
     // Site URL
-    site_url: 'https://freelance-ledger.ai',
+    site_url: 'https://freel.aissistpro.com',
 
     // Enable all security notifications
     mailer_notifications_password_changed_enabled: true,
@@ -479,7 +479,7 @@ async function main() {
     }
     console.log('\n✅ SMTP: Gmail (smtp.gmail.com:587)');
     console.log('✅ Sender: Freelance Ledger <aissistpro9@gmail.com>');
-    console.log('✅ Site URL: https://freelance-ledger.ai');
+    console.log('✅ Site URL: https://freel.aissistpro.com');
   } else {
     console.log('❌ Error:', r.status, JSON.stringify(r.data).slice(0, 500));
   }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserProfile } from '../types';
 import { validateCoupon } from '../services/subscriptionService';
 import TeamManager from './TeamManager';
@@ -8,6 +9,7 @@ interface SubscriptionManagerProps {
 }
 
 const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
+    const navigate = useNavigate();
     const [couponCode, setCouponCode] = useState('');
     const [couponMessage, setCouponMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [isValidating, setIsValidating] = useState(false);
@@ -77,9 +79,9 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* PRO */}
                     {(user.currentPlan === 'free') && (
-                        <a
-                            href="#/checkout?plan=pro"
-                            className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-2xl hover:shadow-lg hover:shadow-emerald-500/20 transition-all group"
+                        <button
+                            onClick={() => navigate('/checkout?plan=pro')}
+                            className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-2xl hover:shadow-lg hover:shadow-emerald-500/20 transition-all group text-left w-full"
                         >
                             <div className="flex items-center gap-3 mb-2">
                                 <span className="text-2xl">⚡</span>
@@ -93,14 +95,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
                                 <li>✓ Clientes ilimitados</li>
                                 <li>✓ Exportar PDF</li>
                             </ul>
-                        </a>
+                        </button>
                     )}
 
                     {/* UNICORN */}
                     {(user.currentPlan === 'free' || user.currentPlan === 'pro') && (
-                        <a
-                            href="#/checkout?plan=unicorn"
-                            className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-2xl hover:shadow-lg hover:shadow-purple-500/20 transition-all group"
+                        <button
+                            onClick={() => navigate('/checkout?plan=unicorn')}
+                            className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-2xl hover:shadow-lg hover:shadow-purple-500/20 transition-all group text-left w-full"
                         >
                             <div className="flex items-center gap-3 mb-2">
                                 <span className="text-2xl">🦄</span>
@@ -114,13 +116,13 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
                                 <li>✓ ADN de Empresa</li>
                                 <li>✓ Asistente IA avanzado</li>
                             </ul>
-                        </a>
+                        </button>
                     )}
 
                     {/* TEAM */}
-                    <a
-                        href="#/checkout?plan=team"
-                        className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-2xl hover:shadow-lg hover:shadow-blue-500/20 transition-all group relative overflow-hidden"
+                    <button
+                        onClick={() => navigate('/checkout?plan=team')}
+                        className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-2xl hover:shadow-lg hover:shadow-blue-500/20 transition-all group relative overflow-hidden text-left w-full"
                     >
                         <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
                             NUEVO
@@ -138,7 +140,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
                             <li>✓ Roles y permisos</li>
                             <li>✓ Gestión de equipo</li>
                         </ul>
-                    </a>
+                    </button>
                 </div>
             )}
 

@@ -15,7 +15,7 @@ import { SubscriptionPlan } from '../types';
 const WOMPI_PUBLIC_KEY = import.meta.env.VITE_WOMPI_PUBLIC_KEY;
 const WOMPI_PRIVATE_KEY = import.meta.env.VITE_WOMPI_PRIVATE_KEY;
 const WOMPI_API_URL = 'https://production.wompi.co/v1';
-const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5173';
+const APP_URL = import.meta.env.VITE_APP_URL || 'https://freel.aissistpro.com';
 
 /**
  * Precios por plan en centavos de COP

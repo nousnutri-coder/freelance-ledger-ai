@@ -9,7 +9,7 @@
  */
 
 const APP_NAME = 'Freelance Ledger';
-const APP_URL = import.meta.env.VITE_APP_URL || 'https://freelance-ledger.ai';
+const APP_URL = import.meta.env.VITE_APP_URL || 'https://freel.aissistpro.com';
 const SUPPORT_EMAIL = 'soporte@freelaissist.com';
 
 // =============================================================================
