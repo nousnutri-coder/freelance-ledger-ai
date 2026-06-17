@@ -1,202 +1,212 @@
 #!/usr/bin/env node
 
 /**
- * Deploy Supabase Edge Function for sending emails.
+ * Deploy Supabase Edge Function "send-email" via Management API
  *
- * REQUISITOS:
- *   - Supabase CLI (https://supabase.com/docs/guides/cli)
- *   - Variable de entorno SUPABASE_SERVICE_KEY con la Service Role Key
- *     (configurada en GitHub Secrets / entorno local)
+ * Node.js 18+ nativo (no requiere CLI de Supabase ni dependencias externas).
+ * Funciona en Windows, Linux y macOS.
  *
- * USO:
- *   export SUPABASE_SERVICE_KEY=sbp_xxx
- *   node scripts/deploy-edge-function.mjs
+ * USO (PowerShell):
+ *   $env:SUPABASE_SERVICE_KEY="sbp_xxx"; node scripts\deploy-edge-function.mjs
  *
- * NOTA: El CLI de Supabase no soporta Windows (win32-x64).
- * En Windows, desplegar manualmente desde el Dashboard de Supabase:
- *   1. Ir a https://supabase.com/dashboard/project/iicdtvhnilhgupckcfrn/edge-functions
- *   2. Crear función "send-email"
- *   3. Copiar el contenido de supabase/functions/send-email/index.ts
- *   4. Configurar secrets: SMTP_HOST, SMTP_PASS, SMTP_USER, SMTP_PORT, SMTP_SENDER
+ * USO (Bash):
+ *   export SUPABASE_SERVICE_KEY=sbp_xxx && node scripts/deploy-edge-function.mjs
  */
 
-import { execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
+import https from 'https';
+import { gzipSync, gunzipSync } from 'zlib';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 
-const DEFAULTS = {
-  SMTP_HOST: 'smtp.gmail.com',
-  SMTP_PORT: '587',
-  SMTP_USER: 'aissistpro9@gmail.com',
-  SMTP_SENDER: 'Freelance Ledger <aissistpro9@gmail.com>',
-};
+const PROJECT_REF = 'iicdtvhnilhgupckcfrn';
+const FN_NAME = 'send-email';
+const API_BASE = `https://api.supabase.com/v1/projects/${PROJECT_REF}`;
 
-const requiredSecrets = [
-  { name: 'SMTP_HOST', value: process.env.SMTP_HOST || DEFAULTS.SMTP_HOST },
-  { name: 'SMTP_PORT', value: process.env.SMTP_PORT || DEFAULTS.SMTP_PORT },
-  { name: 'SMTP_USER', value: process.env.SMTP_USER || DEFAULTS.SMTP_USER },
-  { name: 'SMTP_PASS', value: process.env.SMTP_PASS },
-  { name: 'SMTP_SENDER', value: process.env.SMTP_SENDER || DEFAULTS.SMTP_SENDER },
+const SECRETS = [
+  { name: 'SMTP_HOST', value: 'smtp.gmail.com' },
+  { name: 'SMTP_PORT', value: '587' },
+  { name: 'SMTP_USER', value: 'aissistpro9@gmail.com' },
+  { name: 'SMTP_PASS', value: process.env.SMTP_PASS || 'swjotginidnycrqh' },
+  { name: 'SMTP_SENDER', value: 'Freelance Ledger <aissistpro9@gmail.com>' },
 ];
 
+async function apiJson(method, path, apiKey, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  return { status: res.status, body: text };
+}
+
 async function main() {
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!serviceKey) {
-    console.error('ERROR: SUPABASE_SERVICE_KEY no está configurada.');
-    console.error('Exporta la variable o pásala inline:');
-    console.error('  export SUPABASE_SERVICE_KEY=tu_service_role_key');
-    console.error('  node scripts/deploy-edge-function.mjs');
+  const apiKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!apiKey) {
+    console.error('❌ SUPABASE_SERVICE_KEY no está configurada.');
+    console.error('   $env:SUPABASE_SERVICE_KEY="sbp_xxx"; node scripts/deploy-edge-function.mjs');
     process.exit(1);
   }
-
-  // Verificar que el CLI de Supabase está instalado
-  try {
-    execSync('npx supabase --version', { stdio: 'pipe', cwd: rootDir });
-  } catch {
-    console.log('⚠️  Supabase CLI no detectado. Intentando método alternativo (API directa)...');
-    await deployViaApi(serviceKey);
-    return;
-  }
-
-  // Verificar que el archivo de la función existe
-  const fnPath = join(rootDir, 'supabase', 'functions', 'send-email', 'index.ts');
-  if (!existsSync(fnPath)) {
-    console.error(`ERROR: No se encuentra ${fnPath}`);
-    process.exit(1);
-  }
-
-  console.log('📦 Desplegando Edge Function send-email...\n');
 
   // 1. Configurar secrets
   console.log('🔐 Configurando secrets...');
-  for (const secret of requiredSecrets) {
-    try {
-      execSync(
-        `npx supabase secrets set --project-ref iicdtvhnilhgupckcfrn ${secret.name}="${secret.value}"`,
-        { stdio: 'pipe', cwd: rootDir, env: { ...process.env, SUPABASE_SERVICE_KEY: serviceKey } }
-      );
-      console.log(`   ✅ ${secret.name}`);
-    } catch (err) {
-      console.error(`   ❌ ${secret.name}: ${err.message}`);
-    }
+  const secretsResult = await apiJson('POST', '/secrets', apiKey, SECRETS);
+  if (secretsResult.status >= 400) {
+    console.error(`   ❌ Error: HTTP ${secretsResult.status} — ${secretsResult.body.slice(0, 300)}`);
+  } else {
+    console.log('   ✅ Secrets configurados');
   }
 
-  // 2. Desplegar la función
-  console.log('\n🚀 Desplegando función...');
-  try {
-    execSync(
-      `npx supabase functions deploy send-email --project-ref iicdtvhnilhgupckcfrn`,
-      { stdio: 'inherit', cwd: rootDir, env: { ...process.env, SUPABASE_SERVICE_KEY: serviceKey } }
-    );
-    console.log('\n✅ Función desplegada exitosamente!');
-  } catch (err) {
-    console.error('\n❌ Error desplegando función:', err.message);
-    console.log('\n👉 Despliegue manual: https://supabase.com/dashboard/project/iicdtvhnilhgupckcfrn/edge-functions');
+  // 2. Desplegar función
+  console.log(`\n🚀 Desplegando función "${FN_NAME}"...`);
+
+  const fnPath = join(rootDir, 'supabase', 'functions', FN_NAME, 'index.ts');
+  if (!existsSync(fnPath)) {
+    console.error(`   ❌ No se encuentra: ${fnPath}`);
     process.exit(1);
   }
-}
 
-/**
- * Método alternativo: despliega usando la Management API directamente.
- * Se usa cuando supabase CLI no está disponible.
- */
-async function deployViaApi(apiKey) {
-  const { readFileSync } = await import('fs');
-  const https = await import('https');
-  const { execSync } = await import('child_process');
-  const os = await import('os');
+  const fnCode = readFileSync(fnPath, 'utf-8');
+  console.log(`   📄 Código fuente: ${fnCode.length} bytes`);
 
-  const code = readFileSync(join(rootDir, 'supabase', 'functions', 'send-email', 'index.ts'), 'utf-8');
+  // Create temp directory — tar should have index.ts at root (no source/ prefix)
+  const tmpDir = join(tmpdir(), `sfn-${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true });
+  writeFileSync(join(tmpDir, 'index.ts'), fnCode);
 
-  // Primero configurar secrets via API
-  console.log('🔐 Configurando secrets via API...');
-  await apiRequest(apiKey, '/projects/iicdtvhnilhgupckcfrn/secrets', 'POST', JSON.stringify(
-    requiredSecrets.map(s => ({ name: s.name, value: s.value }))
-  ));
-  console.log('   ✅ Secrets configurados');
+  const tarPath = join(tmpDir, 'function.tar.gz');
+  const fileData = readFileSync(join(tmpDir, 'index.ts'));
 
-  // Probar deploy via Management API
-  console.log('🚀 Desplegando función via API...');
-  try {
-    // Crear tar.gz temporal
-    const tmpDir = execSync('mktemp -d', { encoding: 'utf-8' }).trim();
-    const tarPath = `${tmpDir}/function.tar.gz`;
-    execSync(`cp '${join(rootDir, 'supabase', 'functions', 'send-email', 'index.ts')}' ${tmpDir}/index.ts && cd ${tmpDir} && tar -czf ${tarPath} index.ts`, { stdio: 'pipe' });
-
-    const tarball = readFileSync(tarPath);
-    const boundary = '----Boundary' + Math.random().toString(36).substring(2);
-
-    const body = [
-      `--${boundary}\r\nContent-Disposition: form-data; name="slug"\r\n\r\nsend-email\r\n`,
-      `--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\nsend-email\r\n`,
-      `--${boundary}\r\nContent-Disposition: form-data; name="verify_jwt"\r\n\r\nfalse\r\n`,
-      `--${boundary}\r\nContent-Disposition: form-data; name="body"; filename="function.tar.gz"\r\nContent-Type: application/gzip\r\n\r\n`,
-      tarball.toString('binary'),
-      `\r\n--${boundary}--\r\n`,
-    ].join('');
-    const bodyBuf = Buffer.from(body, 'binary');
-
-    const result = await new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: 'api.supabase.com',
-        path: '/v1/projects/iicdtvhnilhgupckcfrn/functions/deploy',
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': bodyBuf.length,
-        },
-      }, res => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => resolve({ status: res.statusCode, data: d }));
-      });
-      req.on('error', reject);
-      req.write(bodyBuf);
-      req.end();
-    });
-
-    if (result.status === 201 || result.status === 200) {
-      console.log('   ✅ Función desplegada exitosamente!');
-    } else {
-      console.log(`   ⚠️  API respondió ${result.status}: ${result.data.slice(0, 300)}`);
-      console.log('\n👉 Despliegue manual requerido: https://supabase.com/dashboard/project/iicdtvhnilhgupckcfrn/edge-functions');
-    }
-
-    execSync(`rm -rf ${tmpDir}`, { stdio: 'pipe' });
-  } catch (err) {
-    console.error('   ❌ Error:', err.message);
-    console.log('\n👉 Despliegue manual: https://supabase.com/dashboard/project/iicdtvhnilhgupckcfrn/edge-functions');
+  // Build ustar tar header for "index.ts"
+  function ustarHeader(name, size) {
+    const b = Buffer.alloc(512);
+    Buffer.from(name, 'utf-8').copy(b, 0, 0, Math.min(name.length, 100));
+    b.write('000644 ', 100, 8, 'ascii');
+    b.write('000000 ', 108, 8, 'ascii');
+    b.write('000000 ', 116, 8, 'ascii');
+    b.write(size.toString(8).padStart(11, '0') + ' ', 124, 12, 'ascii');
+    b.write('00000000000 ', 136, 12, 'ascii');
+    b[156] = 0x30;
+    Buffer.from('ustar', 'ascii').copy(b, 257);
+    b[262] = 0;
+    Buffer.from('00', 'ascii').copy(b, 263);
+    Buffer.from('root', 'ascii').copy(b, 265);
+    Buffer.from('root', 'ascii').copy(b, 297);
+    b.fill(0x20, 148, 156);
+    let sum = 0;
+    for (let i = 0; i < 512; i++) sum += b[i];
+    b.write(sum.toString(8).padStart(6, '0') + ' \0', 148, 8, 'ascii');
+    return b;
   }
-}
 
-function apiRequest(apiKey, path, method, body) {
-  return new Promise((resolve, reject) => {
-    const https = require('https');
+  const header = ustarHeader('index.ts', fileData.length);
+
+  // Pad data to 512-byte block
+  const padLen = (512 - (fileData.length % 512)) % 512;
+  const dataBlock = Buffer.concat([fileData, Buffer.alloc(padLen)]);
+
+  // End-of-archive: two 512-byte zero blocks
+  const eof = Buffer.alloc(1024);
+
+  const tarBuffer = Buffer.concat([header, dataBlock, eof]);
+
+  // Gzip it
+  const gzipped = gzipSync(tarBuffer);
+  writeFileSync(tarPath, gzipped);
+  console.log(`   📦 Tar.gz: ${(gzipped.length / 1024).toFixed(1)} KB`);
+
+  // Verify tar.gz contents
+  const unzipped = gunzipSync(gzipped);
+  const entryName = unzipped.toString('utf-8', 0, 100).replace(/\0/g, '').trim();
+  console.log(`   🔍 Entry name in tar: "${entryName}"`);
+  if (entryName.includes('source/')) {
+    console.log('   ⚠️  Entry has source/ prefix — may cause path mismatch');
+  }
+
+  // 3. Deploy — try multiple approaches
+  console.log('   📤 Enviando a Supabase Management API...');
+
+  const metadata = JSON.stringify({
+    name: FN_NAME,
+    slug: FN_NAME,
+    verify_jwt: false,
+    entrypoint_path: 'index.ts',
+    import_map: false,
+  });
+
+  // Approach A: multipart/form-data via raw https (most reliable cross-platform)
+  const boundary = '----Boundary' + Math.random().toString(36).substring(2, 15);
+  const encoder = new TextEncoder();
+
+  const part1 =
+    `--${boundary}\r\n` +
+    'Content-Disposition: form-data; name="metadata"\r\n' +
+    'Content-Type: application/json\r\n\r\n' +
+    metadata + '\r\n';
+
+  const part2Header =
+    `--${boundary}\r\n` +
+    'Content-Disposition: form-data; name="file"; filename="function.tar.gz"\r\n' +
+    'Content-Type: application/gzip\r\n\r\n';
+
+  const footer = `\r\n--${boundary}--\r\n`;
+
+  const body = Buffer.concat([
+    encoder.encode(part1 + part2Header),
+    Buffer.from(gzipped),
+    encoder.encode(footer),
+  ]);
+
+  const deployRes = await new Promise((resolve) => {
     const opts = {
       hostname: 'api.supabase.com',
-      path: `/v1${path}`,
-      method,
+      path: `/v1/projects/${PROJECT_REF}/functions/deploy`,
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
       },
     };
-    const req = https.request(opts, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => {
-        try { resolve(JSON.parse(d)); } catch { resolve(d); }
-      });
+    const req = https.request(opts, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
     });
-    req.on('error', reject);
-    if (body) req.write(body);
+    req.on('error', (e) => resolve({ status: 0, body: e.message }));
+    req.setTimeout(30000, () => { req.destroy(); resolve({ status: 0, body: 'Timeout' }); });
+    req.write(body);
     req.end();
   });
+
+  if (deployRes.status >= 200 && deployRes.status < 300) {
+    console.log(`   ✅ Función desplegada exitosamente! (HTTP ${deployRes.status})`);
+    try {
+      const parsed = JSON.parse(deployRes.body);
+      if (parsed.id) console.log(`   📍 ID: ${parsed.id}`);
+      if (parsed.endpoint_url) console.log(`   🔗 ${parsed.endpoint_url}`);
+    } catch {}
+  } else {
+    console.error(`   ❌ Error: HTTP ${deployRes.status}`);
+    console.error(`   ${deployRes.body.slice(0, 1000)}`);
+    console.log('\n👉 Usando Dashboard: https://supabase.com/dashboard/project/' + PROJECT_REF + '/edge-functions');
+  }
+
+  // Cleanup
+  try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+
+  console.log('\n✨ Proceso completado!');
 }
 
-main().catch(console.error);
+main().catch(err => {
+  console.error('❌ Error fatal:', err.message);
+  process.exit(1);
+});
