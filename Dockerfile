@@ -26,6 +26,9 @@ FROM nginx:1.25-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Configuración personalizada de Nginx para SPA
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
 RUN echo 'server { \
     listen 80; \
     server_name _; \
@@ -58,7 +61,7 @@ RUN echo 'server { \
 
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
